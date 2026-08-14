@@ -15,14 +15,15 @@ import {
 import { Enquiry, GalleryItem, BlogPost, BusinessInfo, ServiceItem, FAQItem, Review, SitePageContent } from './src/types.ts';
 
 const app = express();
-const PORT = 3000;
-const DB_FILE = path.join(process.cwd(), 'data', 'db.json');
+const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
+const DB_FILE = process.env.DB_FILE || path.join(process.cwd(), 'data', 'db.json');
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(process.cwd(), 'public', 'uploads');
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(process.cwd(), 'public')));
 app.use('/images', express.static(path.join(process.cwd(), 'public', 'images')));
-app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Ensure data directory and db.json exist
 function ensureDb() {
@@ -707,7 +708,7 @@ app.delete('/api/media', verifyAdmin, (req, res) => {
     }
 
     const filename = path.basename(url);
-    const filePath = path.join(process.cwd(), 'public', 'uploads', filename);
+    const filePath = path.join(UPLOADS_DIR, filename);
 
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
@@ -727,7 +728,7 @@ app.post('/api/upload', verifyAdmin, (req, res) => {
       return res.status(400).json({ error: 'Image fileData is required' });
     }
 
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    const uploadsDir = UPLOADS_DIR;
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
@@ -763,7 +764,7 @@ app.post('/api/upload', verifyAdmin, (req, res) => {
 // List available media files
 app.get('/api/media', verifyAdmin, (_req, res) => {
   try {
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    const uploadsDir = UPLOADS_DIR;
     const imagesDir = path.join(process.cwd(), 'public', 'images');
 
     const uploadsList = fs.existsSync(uploadsDir)
@@ -794,7 +795,7 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
+    app.use('/uploads', express.static(UPLOADS_DIR));
     app.use('/images', express.static(path.join(process.cwd(), 'public', 'images')));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
