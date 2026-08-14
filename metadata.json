@@ -1,0 +1,6 @@
+{
+  "name": "Ian Christie Electrical",
+  "description": "Professional Electrical Services in Dublin, Ireland. Specialising in electrical installations, lighting, consumer unit upgrades, and domestic electrical repairs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

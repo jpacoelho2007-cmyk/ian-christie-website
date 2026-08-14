@@ -1,0 +1,282 @@
+{
+  "businessInfo": {
+    "name": "Ian Christie Electrical",
+    "phone": "+353 86 252 5331",
+    "formattedPhone": "+353 86 252 5331",
+    "email": "Ianc4000@gmail.com",
+    "whatsapp": "+353 86 252 5331",
+    "whatsappFormatted": "+353862525331",
+    "googleMapsUrl": "https://www.google.com/maps/place/Ian+Christie+Electrical/@53.3599877,-6.1968889,17z/data=!3m1!4b1!4m6!3m5!1s0x48670fa0aadf3df7:0x73a46927600012cb!8m2!3d53.3599845!4d-6.1943086!16s%2Fg%2F1tptq0h5",
+    "address": "Dublin, Ireland",
+    "openingHours": "Monday - Friday: 08:00 - 18:00 | Saturday: 09:00 - 16:00 | Sunday: Emergency On-Call",
+    "areasCovered": [
+      "Dublin City Centre",
+      "Clontarf & Fairview",
+      "Drumcondra & Glasnevin",
+      "Raheny & Killester",
+      "Howth & Sutton",
+      "Malahide & Portmarnock",
+      "Swords & North County Dublin",
+      "South Dublin & Surrounds"
+    ]
+  },
+  "pageContent": {
+    "header": {
+      "brandTitle": "IAN CHRISTIE",
+      "brandSubtitle": "ELECTRICAL",
+      "ctaButtonText": "Get a Quote"
+    },
+    "hero": {
+      "ratingScore": "4.8",
+      "ratingLabel": "100+ Reviews",
+      "titleLine1": "POWER",
+      "titleLine2": "EXPERIENCE",
+      "titleLine3": "RELIABILITY",
+      "heroImage": "/images/photo_1.jpg",
+      "introText": "IAN CHRISTIE ELECTRICAL — BESPOKE DOMESTIC & COMMERCIAL INSTALLATIONS ACROSS DUBLIN.",
+      "ctaButtonText": "Get a Quote",
+      "ctaTarget": "contact"
+    },
+    "servicesSection": {
+      "badge": "CAPABILITIES",
+      "title": "SERVICES",
+      "subtitle": "Complete domestic and commercial electrical solutions across Dublin"
+    },
+    "gallerySection": {
+      "badge": "PORTFOLIO",
+      "title": "WORK GALLERY",
+      "subtitle": "Recent electrical installations, lighting setups, and residential upgrades"
+    },
+    "reviewsSection": {
+      "badge": "CLIENT REVIEWS",
+      "title": "TESTIMONIALS",
+      "subtitle": "Verified reviews from Dublin homeowners & commercial clients"
+    },
+    "blogSection": {
+      "badge": "INSIGHTS & ADVICE",
+      "title": "BLOG",
+      "subtitle": "Practical advice, safety insights, and trade experience from Dublin electrician Ian Christie."
+    },
+    "faqSection": {
+      "badge": "HELP",
+      "title": "FAQ",
+      "subtitle": "Common questions about electrical installations, repairs, and quotes"
+    },
+    "contactSection": {
+      "badge": "CONTACT",
+      "title": "GET A QUOTE",
+      "subtitle": "DIRECT CONTACT",
+      "submitButtonText": "Send Enquiry",
+      "successTitle": "Message Sent",
+      "successText": "Thank you. Ian will review your job details and get back to you promptly."
+    },
+    "footer": {
+      "tagline": "Professional domestic and commercial electrical contractor serving Dublin. Safe installations, clear communication, and high-quality craftsmanship.",
+      "areasServedText": "Serving all Dublin areas including Clontarf, Fairview, Drumcondra, Raheny, Malahide, Howth, Swords, and Dublin City Centre.",
+      "copyrightText": "Ian Christie Electrical. All rights reserved."
+    }
+  },
+  "services": [
+    {
+      "id": "installations",
+      "title": "Electrical Installations",
+      "shortDesc": "Complete domestic and light commercial wiring, rewires, extensions, and new electrical circuits.",
+      "fullDesc": "Whether you are renovating a room, adding an extension, or updating an existing installation, Ian Christie Electrical provides safe, reliable electrical wiring built to current safety standards.",
+      "iconName": "Zap",
+      "bulletPoints": [
+        "House & apartment rewires",
+        "Home extension wiring",
+        "New circuit additions",
+        "Safety testing & earthing"
+      ]
+    },
+    {
+      "id": "lighting",
+      "title": "Lighting Solutions",
+      "shortDesc": "Indoor LED spotlights, kitchen task lights, track lighting, pendant fittings, and shop display lights.",
+      "fullDesc": "Professional lighting installation for homes and local retail businesses across Dublin. Enhance room ambience, save energy with modern LEDs, and illuminate task areas cleanly.",
+      "iconName": "Lightbulb",
+      "bulletPoints": [
+        "Under-cabinet kitchen LED lighting",
+        "Pendant & decorative light fittings",
+        "Wire track spotlighting systems",
+        "Retail & commercial shopfront lighting"
+      ]
+    },
+    {
+      "id": "fault-finding",
+      "title": "Fault Finding & Repairs",
+      "shortDesc": "Rapid diagnosis and repair for tripping breakers, faulty switches, dead sockets, and flickering lights.",
+      "fullDesc": "Electrical issues can cause inconvenience and potential safety hazards. Ian uses systematic testing to identify circuit faults quickly and carry out safe, lasting repairs.",
+      "iconName": "SearchCheck",
+      "bulletPoints": [
+        "Tripping circuit breakers",
+        "Intermittent light flickering",
+        "Dead power outlets",
+        "Short circuit diagnosis"
+      ]
+    },
+    {
+      "id": "sockets-switches",
+      "title": "Sockets & Switches",
+      "shortDesc": "Fitting extra wall sockets, USB charging sockets, dimmer switches, and dedicated cooker or shower points.",
+      "fullDesc": "Eliminate messy extension leads by installing double sockets right where you need them. Upgrade old switches to modern, sleek metal or clean white finishes with USB power ports.",
+      "iconName": "Plug",
+      "bulletPoints": [
+        "USB & USB-C wall socket upgrades",
+        "Additional socket outlets",
+        "Dimmer switch installations",
+        "Cooker & appliance connections"
+      ]
+    },
+    {
+      "id": "consumer-units",
+      "title": "Consumer Units / Fuse Boxes",
+      "shortDesc": "Replacing outdated fuse boards with modern consumer units featuring RCD circuit breaker protection.",
+      "fullDesc": "An upgraded consumer unit is the heart of home electrical safety. Modern units cut off power instantly in case of an electrical fault, protecting your family and property.",
+      "iconName": "ShieldAlert",
+      "bulletPoints": [
+        "Fuse board safety upgrades",
+        "RCD circuit protection",
+        "Miniature Circuit Breaker (MCB) replacement",
+        "Earthing & bonding verification"
+      ]
+    },
+    {
+      "id": "domestic-work",
+      "title": "Domestic Electrical Work",
+      "shortDesc": "General home electrical maintenance, shower connections, garden power, and small home improvements.",
+      "fullDesc": "No job is too small. From replacing a single broken light switch to wiring outdoor garden power, Ian provides friendly, local, tidy service you can rely on.",
+      "iconName": "Home",
+      "bulletPoints": [
+        "Electric shower power wiring",
+        "Outdoor & garden sockets",
+        "Smoke alarm replacements",
+        "General electrical fixes"
+      ]
+    }
+  ],
+  "gallery": [
+    {
+      "id": "g1",
+      "title": "Consumer Unit Installation",
+      "caption": "Servicing and wiring a modern residential consumer unit with clear circuit breaker labeling.",
+      "imageUrl": "/uploads/photo_1_1786660004328.jpg",
+      "category": "Consumer Units"
+    },
+    {
+      "id": "g2",
+      "title": "Track & Pendant Lighting",
+      "caption": "Ceiling wire track spotlighting and industrial pendant lights installed in a living area.",
+      "imageUrl": "/images/lighting.jpg",
+      "category": "Lighting"
+    },
+    {
+      "id": "g3",
+      "title": "Kitchen Electrical Work",
+      "caption": "Modern kitchen installation featuring under-cabinet LED task lights and stainless steel double sockets.",
+      "imageUrl": "/images/kitchen.jpg",
+      "category": "Kitchens"
+    },
+    {
+      "id": "g4",
+      "title": "Integrated USB Wall Sockets",
+      "caption": "Clean white double switched wall socket with dual USB charging ports installed.",
+      "imageUrl": "/images/socket.jpg",
+      "category": "Sockets & Wiring"
+    },
+    {
+      "id": "g5",
+      "title": "Weatherproof Junction Box Wiring",
+      "caption": "Precision terminal wiring inside an insulated IP65 junction box for safe circuit distribution.",
+      "imageUrl": "/images/junction_box.jpg",
+      "category": "Sockets & Wiring"
+    },
+    {
+      "id": "g6",
+      "title": "Florist & Retail Shop Lighting",
+      "caption": "Bespoke ceiling spotlighting and warm decorative Edison lights for a Dublin florist shop.",
+      "imageUrl": "/images/florist_shop.jpg",
+      "category": "Commercial"
+    }
+  ],
+  "faqs": [
+    {
+      "id": "f1",
+      "question": "How can I request a quote for electrical work?",
+      "answer": "You can call Ian directly on +353 86 252 5331, send a quick message via WhatsApp, or fill in the enquiry form on our Contact page with details of the work required.",
+      "category": "General"
+    },
+    {
+      "id": "f2",
+      "question": "Can I send photos of the work I need via WhatsApp?",
+      "answer": "Yes, sending photos or a quick short video of your current fuse board, light fitting, or socket via WhatsApp (+353 86 252 5331) is an efficient way to help assess the scope and provide a prompt estimate.",
+      "category": "Quotes"
+    },
+    {
+      "id": "f3",
+      "question": "What areas in Dublin do you serve?",
+      "answer": "Ian Christie Electrical serves residential and commercial clients across Dublin City and surrounding areas, including Clontarf, Fairview, Drumcondra, Raheny, Howth, Malahide, Swords, and South Dublin.",
+      "category": "Service Areas"
+    },
+    {
+      "id": "f4",
+      "question": "What should I do if my circuit breaker keeps tripping?",
+      "answer": "If a switch trips repeatedly, unplug appliances connected to that circuit to see if a faulty device is responsible. If it continues tripping with everything unplugged, leave the breaker off and contact Ian to inspect the fault safely.",
+      "category": "Troubleshooting"
+    },
+    {
+      "id": "f5",
+      "question": "Do you handle both small jobs and larger installations?",
+      "answer": "Absolutely. Whether you need a single socket replaced, additional kitchen lighting installed, a new consumer unit, or a complete rewire, all jobs receive the same careful, professional attention.",
+      "category": "General"
+    }
+  ],
+  "blogPosts": [
+    {
+      "id": "immersion-problems",
+      "title": "Immersion Problems – My Experience",
+      "slug": "immersion-problems-my-experience",
+      "summary": "In my 30–40 years as an electrician, I have come across a huge number of problems with immersion heaters, elements, thermostats and switches. A few problems come up time and time again.",
+      "content": "In my 30–40 years as an electrician, I have come across a huge number of problems with immersion heaters, elements, thermostats and switches. A few problems come up time and time again.\n\n### Thermostats and overheat cut-outs\n\nOne of the most common problems is the overheat cut-out on the thermostat tripping. This is often caused by the thermostat itself failing and allowing the water to become too hot. The overheat cut-out then operates as a safety measure.\n\nIn this situation, I would normally replace the thermostat rather than simply resetting the cut-out.\n\n### Immersion elements tripping the RCD\n\nAnother common problem is an immersion element causing the RCD to trip. Usually the element will need to be replaced.\n\nHowever, replacing an element in an old cylinder can be tricky. Removing a very old element can sometimes damage or distort the cylinder, preventing the new element from sealing properly. In the worst case, the cylinder may need to be replaced.\n\n### Immersion switches\n\nOlder immersion switches can also burn out, particularly the contacts inside the switch. In most cases, replacing the switch solves the problem.\n\nI also come across older installations where the immersion circuit doesn't have appropriate RCD protection. Where I find this, I recommend upgrading the installation to meet the appropriate current safety requirements.\n\n### 260 immersion elements!\n\nOne of my first electrical contracts was in Darndale, where I was involved in changing 260 immersion elements while the estate was being redesigned.\n\nSo after 30–40 years of working on immersions, I would say I have gained quite a bit of experience with immersion elements, thermostats, switches and the problems that can arise from them.\n\n### Wi-Fi immersion switches\n\nA more recent development is the Wi-Fi immersion switch. These allow you to control your immersion from your phone, including setting timers and using a boost function.\n\nYou don't even have to be at home. You could switch the immersion on while you're at work so you have hot water when you get home, or even control it while you're abroad.\n\nImmersions are relatively simple, but they involve electricity, water and a high-power heating element, so problems should always be properly investigated rather than simply resetting a tripped safety device.\n\nIf your immersion is not heating, constantly tripping, cutting out or burning the switch, I can inspect it and advise on the most appropriate solution.",
+      "date": "August 2026",
+      "author": "Ian Christie",
+      "imageUrl": "/images/photo_1.jpg",
+      "tags": [
+        "Immersion Heaters",
+        "Troubleshooting",
+        "Electrical Safety",
+        "Domestic"
+      ],
+      "published": true
+    }
+  ],
+  "reviews": [
+    {
+      "id": "r1",
+      "authorName": "Gail Firth",
+      "rating": 5,
+      "relativeTime": "Verified Google Customer",
+      "text": "I had an emergency electrical situation I needed handled on Easter Monday and Ian was able to come out within an hour of my call and he did the job perfectly for a great price. He was a very nice man and very professional. I highly recommend him!",
+      "source": "google",
+      "googleProfileUrl": "https://www.google.com/maps/place/Ian+Christie+Electrical/@53.3599877,-6.1968889,17z/data=!3m1!4b1!4m6!3m5!1s0x48670fa0aadf3df7:0x73a46927600012cb!8m2!3d53.3599845!4d-6.1943086!16s%2Fg%2F1tptq0h5"
+    }
+  ],
+  "enquiries": [
+    {
+      "id": "enq_sample_1",
+      "name": "Sample Customer Inquiry",
+      "email": "customer@example.com",
+      "phone": "+353 87 123 4567",
+      "message": "Hi Ian, looking for a quote to add 2 USB sockets in my kitchen in Clontarf. Thanks!",
+      "date": "2026-08-08T01:14:36.747Z",
+      "status": "read",
+      "preferredContact": "whatsapp"
+    }
+  ],
+  "adminAuth": {
+    "hash": "fb947e162177df3c8daca3d460f4c22e8a98b00d0ecb766bec3fc81d88d738db739566c8b73d9f8dd2498da7f8306c230473e28058645bf3c84198ab5df63b56",
+    "salt": "a9bec0ac4e6d4273d2bbca1cdb0eed53",
+    "updatedAt": "2026-08-13T22:38:57.689Z"
+  }
+}
