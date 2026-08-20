@@ -152,11 +152,11 @@ export default function QuoteModal({
             <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
               <span>Urgent enquiry?</span>
               <a
-                href={`tel:${businessInfo.phone.replace(/\s+/g, '')}`}
+                href={`tel:${(businessInfo.phone || '').replace(/\s+/g, '')}`}
                 className="font-bold text-amber-400 hover:underline flex items-center gap-1"
               >
                 <Phone className="w-3.5 h-3.5 text-amber-400" />
-                <span>Call {businessInfo.phone}</span>
+                <span>Call {businessInfo.phone || ''}</span>
               </a>
             </div>
           </form>

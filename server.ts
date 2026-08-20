@@ -189,8 +189,10 @@ function readDb() {
   if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
     try {
       if (dbCache) return dbCache;
-      // loadDbFromSupabase will initialize from defaults or insert db.json data when empty
-      return loadDbFromSupabase();
+      // If dbCache isn't populated yet, start an async load but fall back to
+      // the local DB synchronously so we don't return a Promise to handlers.
+      // This prevents endpoints from accidentally sending incomplete data.
+      loadDbFromSupabase().catch(err => console.error('Background Supabase load failed:', err));
     } catch (err) {
       console.error('Failed to load from Supabase, falling back to local DB:', err);
     }
@@ -394,8 +396,9 @@ app.post('/api/admin/change-password', verifyAdmin, (req, res) => {
 // Site Info (GET all main data)
 app.get('/api/site-info', (_req, res) => {
   const db = readDb();
+  const mergedBusinessInfo = { ...(initialBusinessInfo || {}), ...(db.businessInfo || {}) };
   res.json({
-    businessInfo: db.businessInfo || initialBusinessInfo,
+    businessInfo: mergedBusinessInfo,
     pageContent: db.pageContent || initialSiteContent,
     services: db.services || initialServices,
     faqs: db.faqs || initialFAQs,

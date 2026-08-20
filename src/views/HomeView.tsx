@@ -684,8 +684,8 @@ export default function HomeView({
               <div className="space-y-4 text-xs text-slate-300">
                 <div>
                   <span className="block text-[10px] uppercase font-bold text-slate-500">Phone</span>
-                  <a href={`tel:${businessInfo.phone.replace(/\s+/g, '')}`} className="text-lg font-bold text-amber-400 hover:underline">
-                    {businessInfo.phone}
+                  <a href={`tel:${(businessInfo.phone || '').replace(/\s+/g, '')}`} className="text-lg font-bold text-amber-400 hover:underline">
+                    {businessInfo.phone || ''}
                   </a>
                 </div>
 

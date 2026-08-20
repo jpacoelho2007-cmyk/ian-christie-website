@@ -186,8 +186,8 @@ export default function ContactView({ businessInfo }: ContactViewProps) {
                   </div>
                   <div>
                     <span className="block text-[10px] font-bold uppercase text-slate-500">Call Directly</span>
-                    <a href={`tel:${businessInfo.phone.replace(/\s+/g, '')}`} className="text-sm font-bold text-white hover:text-amber-400 transition-colors">
-                      {businessInfo.phone}
+                    <a href={`tel:${(businessInfo.phone || '').replace(/\s+/g, '')}`} className="text-sm font-bold text-white hover:text-amber-400 transition-colors">
+                      {businessInfo.phone || ''}
                     </a>
                   </div>
                 </li>

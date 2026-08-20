@@ -96,8 +96,8 @@ export default function Footer({ businessInfo, pageContent, setActiveTab }: Foot
             <ul className="space-y-2.5 text-xs text-slate-300">
               <li>
                 <span className="block text-[10px] uppercase font-bold text-slate-500">Phone</span>
-                <a href={`tel:${businessInfo.phone.replace(/\s+/g, '')}`} className="font-bold hover:text-amber-400 transition-colors">
-                  {businessInfo.phone}
+                <a href={`tel:${(businessInfo.phone || '').replace(/\s+/g, '')}`} className="font-bold hover:text-amber-400 transition-colors">
+                  {businessInfo.phone || ''}
                 </a>
               </li>
               <li>
