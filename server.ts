@@ -1,7 +1,125 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_KEY || ''
+);
+// Optional server-side client using service role key for Storage operations
+const serviceSupabase = process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(process.env.SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY)
+  : null;
+const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || 'uploads';
+
+let dbCache: any = null;
+
+async function loadDbFromSupabase() {
+  const dbClient: any = serviceSupabase || supabase;
+  const { data, error } = await dbClient
+    .from('site_data')
+    .select('data')
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Supabase load error:', error);
+    throw error;
+  }
+
+  if (data?.data) {
+    dbCache = data.data;
+    return dbCache;
+  }
+
+  // Primeira vez: tenta inicializar a partir do db.json local se existir
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const raw = fs.readFileSync(DB_FILE, 'utf8');
+      const local = JSON.parse(raw);
+      dbCache = {
+        businessInfo: local.businessInfo || initialBusinessInfo,
+        pageContent: local.pageContent || initialSiteContent,
+        services: local.services || initialServices,
+        gallery: local.gallery || initialGallery,
+        faqs: local.faqs || initialFAQs,
+        blogPosts: local.blogPosts || initialBlogPosts,
+        reviews: local.reviews || initialReviews,
+        adminAuth: local.adminAuth || null,
+        enquiries: local.enquiries || []
+      };
+    } else {
+      dbCache = {
+        businessInfo: initialBusinessInfo,
+        pageContent: initialSiteContent,
+        services: initialServices,
+        gallery: initialGallery,
+        faqs: initialFAQs,
+        blogPosts: initialBlogPosts,
+        reviews: initialReviews,
+        adminAuth: null,
+        enquiries: []
+      };
+    }
+  } catch (err) {
+    console.error('Failed reading local DB for initial Supabase seed:', err);
+    dbCache = {
+      businessInfo: initialBusinessInfo,
+      pageContent: initialSiteContent,
+      services: initialServices,
+      gallery: initialGallery,
+      faqs: initialFAQs,
+      blogPosts: initialBlogPosts,
+      reviews: initialReviews,
+      adminAuth: null,
+      enquiries: []
+    };
+  }
+
+  const { error: insertError } = await dbClient
+    .from('site_data')
+    .insert({ data: dbCache });
+
+  if (insertError) {
+    console.error('Supabase insert error:', insertError);
+    throw insertError;
+  }
+
+  return dbCache;
+}
+
+async function saveDbToSupabase(data: any) {
+  dbCache = data;
+  const dbClient: any = serviceSupabase || supabase;
+
+  const { data: existing } = await dbClient
+    .from('site_data')
+    .select('id')
+    .limit(1)
+    .maybeSingle();
+
+  if (existing?.id) {
+    const { error } = await dbClient
+      .from('site_data')
+      .update({
+        data,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', existing.id);
+
+    if (error) console.error('Supabase save error:', error);
+  } else {
+    const { error } = await dbClient
+      .from('site_data')
+      .insert({ data });
+
+    if (error) console.error('Supabase insert error:', error);
+  }
+}
+
 import { createServer as createViteServer } from 'vite';
 import {
   initialBusinessInfo,
@@ -67,6 +185,17 @@ function ensureDb() {
 }
 
 function readDb() {
+  // Prefer Supabase when configured; fallback to local db.json
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
+    try {
+      if (dbCache) return dbCache;
+      // loadDbFromSupabase will initialize from defaults or insert db.json data when empty
+      return loadDbFromSupabase();
+    } catch (err) {
+      console.error('Failed to load from Supabase, falling back to local DB:', err);
+    }
+  }
+
   ensureDb();
   try {
     const raw = fs.readFileSync(DB_FILE, 'utf8');
@@ -97,7 +226,16 @@ function readDb() {
 
 function writeDb(data: any) {
   ensureDb();
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+  // Write to Supabase when configured (non-destructive), and also keep a local backup
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
+    saveDbToSupabase(data).catch(err => console.error('Failed to save to Supabase:', err));
+  }
+
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Failed to write local DB file:', err);
+  }
 }
 
 // Secure Admin Authentication Helpers
@@ -699,21 +837,45 @@ app.delete('/api/reviews/:id', verifyAdmin, (req, res) => {
   res.json({ success: true });
 });
 
-// Delete media endpoint
-app.delete('/api/media', verifyAdmin, (req, res) => {
+// Delete media endpoint (filename param). Supports Supabase Storage and local uploads
+app.delete('/api/media/:filename', verifyAdmin, async (req, res) => {
   try {
-    const { url } = req.body;
-    if (!url || typeof url !== 'string' || !url.startsWith('/uploads/')) {
-      return res.status(400).json({ error: 'Valid upload path required' });
+    const { filename } = req.params;
+    if (!filename) return res.status(400).json({ error: 'Filename required' });
+
+    let removedFromStorage = false;
+    let removedFromLocal = false;
+
+    // If Supabase configured, try delete from storage first (prefer service client)
+    if (process.env.SUPABASE_URL && (process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)) {
+      try {
+        const storageClient: any = serviceSupabase || supabase;
+        const { error } = await storageClient.storage.from(SUPABASE_BUCKET).remove([filename]);
+        if (!error) {
+          removedFromStorage = true;
+        } else {
+          console.warn('Supabase remove error:', error.message);
+        }
+      } catch (err) {
+        console.error('Supabase remove failed:', err);
+      }
     }
 
-    const filename = path.basename(url);
-    const filePath = path.join(UPLOADS_DIR, filename);
-
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-      return res.json({ success: true, message: 'File deleted' });
+    // Always attempt local deletion as well (cleanup fallback files)
+    try {
+      const filePath = path.join(UPLOADS_DIR, filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        removedFromLocal = true;
+      }
+    } catch (err) {
+      console.error('Local file delete failed:', err);
     }
+
+    if (removedFromStorage || removedFromLocal) {
+      return res.json({ success: true, message: `Removed storage=${removedFromStorage}, local=${removedFromLocal}` });
+    }
+
     return res.status(404).json({ error: 'File not found' });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -721,16 +883,12 @@ app.delete('/api/media', verifyAdmin, (req, res) => {
 });
 
 // Media & Uploads API
-app.post('/api/upload', verifyAdmin, (req, res) => {
+// Upload to Supabase Storage (with local fallback)
+app.post('/api/upload', verifyAdmin, async (req, res) => {
   try {
     const { filename, fileData } = req.body;
     if (!fileData) {
       return res.status(400).json({ error: 'Image fileData is required' });
-    }
-
-    const uploadsDir = UPLOADS_DIR;
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
     }
 
     // Sanitize filename
@@ -738,23 +896,34 @@ app.post('/api/upload', verifyAdmin, (req, res) => {
     const ext = path.extname(originalName) || '.jpg';
     const base = path.basename(originalName, ext);
     const safeName = `${base}_${Date.now()}${ext}`;
-    const targetPath = path.join(uploadsDir, safeName);
 
-    // Strip base64 metadata prefix if present (e.g. data:image/png;base64,...)
-    const base64Data = fileData.replace(/^data:image\/\w+;base64,/, '').replace(/^data:[^;]+;base64,/, '');
+    // Strip base64 metadata prefix if present
+    const base64Data = String(fileData).replace(/^data:image\/\w+;base64,/, '').replace(/^data:[^;]+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
 
+    // Try Supabase Storage first (prefer service client)
+    if (process.env.SUPABASE_URL && (process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)) {
+      try {
+        const storageClient: any = serviceSupabase || supabase;
+        const uploadRes: any = await storageClient.storage.from(SUPABASE_BUCKET).upload(safeName, buffer, { contentType: 'image/*' });
+        if (!uploadRes.error) {
+          const { data: urlData } = storageClient.storage.from(SUPABASE_BUCKET).getPublicUrl(safeName);
+          const publicUrl = urlData?.publicUrl || '';
+          return res.status(201).json({ success: true, url: publicUrl, filename: safeName, originalName, size: buffer.length });
+        }
+        console.warn('Supabase upload error:', uploadRes.error?.message || uploadRes.error);
+      } catch (err) {
+        console.error('Supabase upload failed, falling back to local storage:', err);
+      }
+    }
+
+    // Fallback: local filesystem
+    const uploadsDir = UPLOADS_DIR;
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    const targetPath = path.join(uploadsDir, safeName);
     fs.writeFileSync(targetPath, buffer);
-
     const publicUrl = `/uploads/${safeName}`;
-
-    return res.status(201).json({
-      success: true,
-      url: publicUrl,
-      filename: safeName,
-      originalName: originalName,
-      size: buffer.length
-    });
+    return res.status(201).json({ success: true, url: publicUrl, filename: safeName, originalName, size: buffer.length });
   } catch (err: any) {
     console.error('Upload error:', err);
     return res.status(500).json({ error: err.message || 'Failed to upload image' });
@@ -762,23 +931,48 @@ app.post('/api/upload', verifyAdmin, (req, res) => {
 });
 
 // List available media files
-app.get('/api/media', verifyAdmin, (_req, res) => {
+app.get('/api/media', verifyAdmin, async (_req, res) => {
   try {
     const uploadsDir = UPLOADS_DIR;
     const imagesDir = path.join(process.cwd(), 'public', 'images');
 
-    const uploadsList = fs.existsSync(uploadsDir)
-      ? fs.readdirSync(uploadsDir).filter(f => /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(f)).map(f => `/uploads/${f}`)
-      : [];
+    const files: { name: string; url: string; size: number; modified: string }[] = [];
 
-    const imagesList = fs.existsSync(imagesDir)
+    // Supabase Storage listing (prefer service client)
+    if (process.env.SUPABASE_URL && (process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)) {
+      try {
+        const storageClient: any = serviceSupabase || supabase;
+        const listRes: any = await storageClient.storage.from(SUPABASE_BUCKET).list('', { limit: 1000 });
+        if (!listRes.error && Array.isArray(listRes.data)) {
+          for (const item of listRes.data) {
+            if (item.name && /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(item.name)) {
+              const { data: urlData } = storageClient.storage.from(SUPABASE_BUCKET).getPublicUrl(item.name);
+              files.push({ name: item.name, url: urlData?.publicUrl || '', size: item.size || 0, modified: item.updated_at || '' });
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to list Supabase storage objects:', err);
+      }
+    }
+
+    // Local uploads fallback
+    if (fs.existsSync(uploadsDir)) {
+      const localFiles = fs.readdirSync(uploadsDir).filter(f => /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(f));
+      for (const f of localFiles) {
+        try {
+          const stat = fs.statSync(path.join(uploadsDir, f));
+          files.push({ name: f, url: `/uploads/${f}`, size: stat.size || 0, modified: stat.mtime.toISOString() });
+        } catch {}
+      }
+    }
+
+    // Stock images
+    const stock: string[] = fs.existsSync(imagesDir)
       ? fs.readdirSync(imagesDir).filter(f => /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(f)).map(f => `/images/${f}`)
       : [];
 
-    return res.json({
-      uploads: uploadsList,
-      stock: imagesList
-    });
+    return res.json({ files, uploads: files.map(f => f.url), stock });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
@@ -786,6 +980,16 @@ app.get('/api/media', verifyAdmin, (_req, res) => {
 
 // START SERVER / VITE INTEGRATION
 async function startServer() {
+  // If Supabase is configured, preload the DB into memory so handlers have
+  // synchronous access to `dbCache` and don't accidentally operate on a
+  // pending Promise. This prefers the service client via loadDbFromSupabase().
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
+    try {
+      await loadDbFromSupabase();
+    } catch (err) {
+      console.error('Failed to preload DB from Supabase at startup:', err);
+    }
+  }
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
