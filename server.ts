@@ -186,7 +186,7 @@ function ensureDb() {
 
 function readDb() {
   // Prefer Supabase when configured; fallback to local db.json
-  if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
+  if (process.env.SUPABASE_URL && (process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)) {
     try {
       if (dbCache) return dbCache;
       // If dbCache isn't populated yet, start an async load but fall back to
@@ -229,7 +229,7 @@ function readDb() {
 function writeDb(data: any) {
   ensureDb();
   // Write to Supabase when configured (non-destructive), and also keep a local backup
-  if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
+  if (process.env.SUPABASE_URL && (process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)) {
     saveDbToSupabase(data).catch(err => console.error('Failed to save to Supabase:', err));
   }
 
@@ -986,7 +986,7 @@ async function startServer() {
   // If Supabase is configured, preload the DB into memory so handlers have
   // synchronous access to `dbCache` and don't accidentally operate on a
   // pending Promise. This prefers the service client via loadDbFromSupabase().
-  if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
+  if (process.env.SUPABASE_URL && (process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)) {
     try {
       await loadDbFromSupabase();
     } catch (err) {
