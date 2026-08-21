@@ -5,6 +5,52 @@
     "updatedAt": "2026-08-20T17:39:49.322Z"
   },
   "businessInfo": {
-    "name": "Ian Christie Electrical (MANUAL PATCH)"
-  }
+    "name": "Ian Christie Electrical",
+    "email": "Ianc4000@gmail.com",
+    "phone": "+353 86 252 5331",
+    "address": "Dublin, Ireland",
+    "whatsapp": "+353 86 252 5331",
+    "areasCovered": [
+      "Dublin City Centre",
+      "Clontarf & Fairview",
+      "Drumcondra & Glasnevin",
+      "Raheny & Killester",
+      "Howth & Sutton",
+      "Malahide & Portmarnock",
+      "Swords & North County Dublin",
+      "South Dublin & Surrounds"
+    ],
+    "openingHours": "Monday - Friday: 08:00 - 18:00 | Saturday: 09:00 - 16:00 | Sunday: Emergency On-Call",
+    "googleMapsUrl": "https://www.google.com/maps/place/Ian+Christie+Electrical/@53.3599877,-6.1968889,17z/data=!3m1!4b1!4m6!3m5!1s0x48670fa0aadf3df7:0x73a46927600012cb!8m2!3d53.3599845!4d-6.1943086!16s%2Fg%2F1tptq0h5",
+    "formattedPhone": "+353 86 252 5331",
+    "whatsappFormatted": "+353862525331"
+  },
+  "enquiries": [
+    {
+      "id": "enq_1787307936646_1s8ue",
+      "name": "Test User",
+      "email": "test@example.com",
+      "phone": "",
+      "message": "Hello from smoke test",
+      "date": "2026-08-21T10:25:36.646Z",
+      "status": "new",
+      "preferredContact": "phone"
+    }
+  ],
+  "services": [
+    {
+      "id": "srv_1787308180539",
+      "title": "E2E Test Service 2026-08-21",
+      "shortDesc": "Initial short desc",
+      "fullDesc": "Full description",
+      "iconName": "Zap",
+      "bulletPoints": [
+        "bp1",
+        "bp2"
+      ]
+    }
+  ],
+  "faqs": [],
+  "gallery": [],
+  "blogPosts": []
 }

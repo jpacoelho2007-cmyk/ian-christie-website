@@ -70,6 +70,7 @@ export default function AdminView({
   const [mediaFiles, setMediaFiles] = useState<{ name: string; url: string; size: number; modified: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
+  const [actionError, setActionError] = useState('');
 
   // Page Content Edit State
   const [pageContent, setPageContent] = useState<SitePageContent>(
@@ -367,8 +368,19 @@ export default function AdminView({
       });
 
       if (res.ok) {
+        const d = await res.json();
+        if (d && d.businessInfo) {
+          setSiteInfo(d.businessInfo as BusinessInfo);
+        }
         showFeedback('Business details updated successfully!');
+        setActionError('');
         onRefreshData();
+      } else {
+        const errBody = await res.json().catch(() => ({}));
+        const msg = errBody.error || `Save failed (${res.status})`;
+        console.error('Save site-info failed:', msg);
+        setActionError(String(msg));
+        // keep existing state so user can retry
       }
     } catch (err) {
       console.error(err);
@@ -752,6 +764,12 @@ export default function AdminView({
             <span className="text-xs font-bold text-emerald-400 bg-emerald-950 border border-emerald-800 px-3 py-1.5 rounded-lg flex items-center gap-1.5 animate-in fade-in">
               <Check className="w-3.5 h-3.5" />
               <span>{actionMsg}</span>
+            </span>
+          )}
+          {actionError && (
+            <span className="p-3 bg-red-950/80 border border-red-800 text-red-300 text-xs rounded-xl flex items-center gap-2">
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>{actionError}</span>
             </span>
           )}
 

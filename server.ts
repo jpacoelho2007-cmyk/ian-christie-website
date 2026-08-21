@@ -15,6 +15,26 @@ const serviceSupabase = process.env.SUPABASE_SERVICE_ROLE_KEY
   : null;
 const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || 'uploads';
 
+// Security checks: enforce ADMIN_SESSION_SECRET in production
+if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_SESSION_SECRET) {
+  console.error('FATAL: ADMIN_SESSION_SECRET must be set in production environment. Set ADMIN_SESSION_SECRET as a secret in your host (Render).');
+  process.exit(1);
+}
+
+function generateRandomString(len = 24) {
+  return crypto.randomBytes(Math.max(12, Math.ceil(len / 2))).toString('hex').slice(0, len);
+}
+
+function getInitialAdminPassword(): string | undefined {
+  // If operator provided ADMIN_INITIAL_PASSWORD, use it. Otherwise in non-production
+  // generate a random password to avoid hardcoded defaults.
+  if (process.env.ADMIN_INITIAL_PASSWORD) return process.env.ADMIN_INITIAL_PASSWORD;
+  if (process.env.NODE_ENV === 'production') return undefined;
+  const pw = generateRandomString(12);
+  console.warn('No ADMIN_INITIAL_PASSWORD provided — generated a development-only admin password:', pw);
+  return pw;
+}
+
 let dbCache: any = null;
 
 async function loadDbFromSupabase() {
@@ -110,13 +130,19 @@ async function saveDbToSupabase(data: any) {
       })
       .eq('id', existing.id);
 
-    if (error) console.error('Supabase save error:', error);
+    if (error) {
+      console.error('Supabase save error:', error);
+      throw error;
+    }
   } else {
     const { error } = await dbClient
       .from('site_data')
       .insert({ data });
 
-    if (error) console.error('Supabase insert error:', error);
+    if (error) {
+      console.error('Supabase insert error:', error);
+      throw error;
+    }
   }
 }
 
@@ -151,8 +177,13 @@ function ensureDb() {
   }
 
   if (!fs.existsSync(DB_FILE)) {
-    const defaultSalt = 'ian_christie_elec_salt_2026';
-    const defaultHash = crypto.pbkdf2Sync('ian2026', defaultSalt, 100000, 64, 'sha512').toString('hex');
+    const initialPw = getInitialAdminPassword();
+    if (!initialPw) {
+      console.error('No initial admin password available. In production, set ADMIN_INITIAL_PASSWORD or pre-seed admin credentials in Supabase.');
+      throw new Error('Missing initial admin credentials');
+    }
+    const defaultSalt = generateRandomString(32);
+    const defaultHash = crypto.pbkdf2Sync(initialPw, defaultSalt, 100000, 64, 'sha512').toString('hex');
 
     const defaultData = {
       businessInfo: initialBusinessInfo,
@@ -226,22 +257,36 @@ function readDb() {
   }
 }
 
-function writeDb(data: any) {
+async function writeDb(data: any) {
   ensureDb();
-  // Write to Supabase when configured (non-destructive), and also keep a local backup
+  // Attempt to write to Supabase when configured (primary persistence), and
+  // always keep a local backup. If Supabase write fails, throw so callers can
+  // react.
   if (process.env.SUPABASE_URL && (process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)) {
-    saveDbToSupabase(data).catch(err => console.error('Failed to save to Supabase:', err));
+    try {
+      await saveDbToSupabase(data);
+    } catch (err) {
+      console.error('Failed to save to Supabase:', err);
+      // Still write local backup before rethrowing
+      try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+      } catch (e) {
+        console.error('Failed to write local DB file after Supabase error:', e);
+      }
+      throw err;
+    }
   }
 
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
   } catch (err) {
     console.error('Failed to write local DB file:', err);
+    // don't throw — local write failures shouldn't block the app
   }
 }
 
 // Secure Admin Authentication Helpers
-const SECRET_SIGNING_KEY = process.env.ADMIN_SESSION_SECRET || 'ian_session_key_92837498273';
+const SECRET_SIGNING_KEY = process.env.ADMIN_SESSION_SECRET;
 
 function getStoredPasswordHash(): { hash: string; salt: string } {
   const db = readDb();
@@ -249,14 +294,16 @@ function getStoredPasswordHash(): { hash: string; salt: string } {
     return { hash: db.adminAuth.hash, salt: db.adminAuth.salt };
   }
   // Initialize default credentials if not yet set
-  const defaultSalt = 'ian_christie_elec_salt_2026';
-  const defaultHash = crypto.pbkdf2Sync('ian2026', defaultSalt, 100000, 64, 'sha512').toString('hex');
+      const initialPw = getInitialAdminPassword();
+      const defaultSalt = generateRandomString(32);
+      const defaultHash = initialPw ? crypto.pbkdf2Sync(initialPw, defaultSalt, 100000, 64, 'sha512').toString('hex') : crypto.pbkdf2Sync(generateRandomString(32), defaultSalt, 100000, 64, 'sha512').toString('hex');
   db.adminAuth = {
     hash: defaultHash,
     salt: defaultSalt,
     updatedAt: new Date().toISOString()
   };
-  writeDb(db);
+      // writeDb is async; fire-and-forget here but ensure errors are logged
+      writeDb(db).catch(err => console.error('Failed to write default adminAuth to DB:', err));
   return { hash: defaultHash, salt: defaultSalt };
 }
 
@@ -280,7 +327,8 @@ function updateAdminPassword(newPassword: string): boolean {
     salt: newSalt,
     updatedAt: new Date().toISOString()
   };
-  writeDb(db);
+  // writeDb is async; do not block here but log errors if any
+  writeDb(db).catch(err => console.error('Failed to persist new admin password:', err));
   return true;
 }
 
@@ -408,11 +456,17 @@ app.get('/api/site-info', (_req, res) => {
   });
 });
 
-app.put('/api/site-info', verifyAdmin, (req, res) => {
-  const db = readDb();
-  db.businessInfo = { ...db.businessInfo, ...req.body };
-  writeDb(db);
-  res.json({ success: true, businessInfo: db.businessInfo });
+app.put('/api/site-info', verifyAdmin, async (req, res) => {
+  try {
+    const db = readDb();
+    db.businessInfo = { ...db.businessInfo, ...req.body };
+    await writeDb(db);
+    return res.json({ success: true, businessInfo: db.businessInfo });
+  } catch (err: any) {
+    console.error('Error saving site-info:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to save site information';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
 // Page Content (All Headings, Text, Badges, Buttons, Footers)
@@ -421,11 +475,17 @@ app.get('/api/page-content', (_req, res) => {
   res.json({ pageContent: db.pageContent || initialSiteContent });
 });
 
-app.put('/api/page-content', verifyAdmin, (req, res) => {
-  const db = readDb();
-  db.pageContent = { ...(db.pageContent || initialSiteContent), ...req.body };
-  writeDb(db);
-  res.json({ success: true, pageContent: db.pageContent });
+app.put('/api/page-content', verifyAdmin, async (req, res) => {
+  try {
+    const db = readDb();
+    db.pageContent = { ...(db.pageContent || initialSiteContent), ...req.body };
+    await writeDb(db);
+    return res.json({ success: true, pageContent: db.pageContent });
+  } catch (err: any) {
+    console.error('Error saving page-content:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to save page content';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
 // Services API
@@ -434,7 +494,7 @@ app.get('/api/services', (_req, res) => {
   res.json({ services: db.services || initialServices });
 });
 
-app.post('/api/services', verifyAdmin, (req, res) => {
+app.post('/api/services', verifyAdmin, async (req, res) => {
   const { title, shortDesc, fullDesc, iconName, bulletPoints } = req.body;
   if (!title) {
     return res.status(400).json({ error: 'Service title is required' });
@@ -451,11 +511,17 @@ app.post('/api/services', verifyAdmin, (req, res) => {
   };
 
   db.services = [...(db.services || []), newService];
-  writeDb(db);
-  res.status(201).json({ success: true, service: newService });
+  try {
+    await writeDb(db);
+    return res.status(201).json({ success: true, service: newService });
+  } catch (err: any) {
+    console.error('Error saving new service:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to save service';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
-app.put('/api/services/:id', verifyAdmin, (req, res) => {
+app.put('/api/services/:id', verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const { title, shortDesc, fullDesc, iconName, bulletPoints } = req.body;
   const db = readDb();
@@ -474,27 +540,45 @@ app.put('/api/services/:id', verifyAdmin, (req, res) => {
     return s;
   });
 
-  writeDb(db);
-  res.json({ success: true });
+  try {
+    await writeDb(db);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Error updating service:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to update service';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
-app.delete('/api/services/:id', verifyAdmin, (req, res) => {
+app.delete('/api/services/:id', verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const db = readDb();
   db.services = (db.services || []).filter((s: ServiceItem) => s.id !== id);
-  writeDb(db);
-  res.json({ success: true });
+  try {
+    await writeDb(db);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Error deleting service:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to delete service';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
-app.put('/api/services-reorder', verifyAdmin, (req, res) => {
+app.put('/api/services-reorder', verifyAdmin, async (req, res) => {
   const { services } = req.body;
   if (!Array.isArray(services)) {
     return res.status(400).json({ error: 'Services list must be an array' });
   }
   const db = readDb();
   db.services = services;
-  writeDb(db);
-  res.json({ success: true });
+  try {
+    await writeDb(db);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Error reordering services:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to reorder services';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
 // FAQs API
@@ -503,7 +587,7 @@ app.get('/api/faqs', (_req, res) => {
   res.json({ faqs: db.faqs || initialFAQs });
 });
 
-app.post('/api/faqs', verifyAdmin, (req, res) => {
+app.post('/api/faqs', verifyAdmin, async (req, res) => {
   const { question, answer, category } = req.body;
   if (!question || !answer) {
     return res.status(400).json({ error: 'Question and answer are required' });
@@ -518,11 +602,17 @@ app.post('/api/faqs', verifyAdmin, (req, res) => {
   };
 
   db.faqs = [...(db.faqs || []), newFaq];
-  writeDb(db);
-  res.status(201).json({ success: true, faq: newFaq });
+  try {
+    await writeDb(db);
+    return res.status(201).json({ success: true, faq: newFaq });
+  } catch (err: any) {
+    console.error('Error saving new FAQ:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to save FAQ';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
-app.put('/api/faqs/:id', verifyAdmin, (req, res) => {
+app.put('/api/faqs/:id', verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const { question, answer, category } = req.body;
   const db = readDb();
@@ -539,31 +629,49 @@ app.put('/api/faqs/:id', verifyAdmin, (req, res) => {
     return f;
   });
 
-  writeDb(db);
-  res.json({ success: true });
+  try {
+    await writeDb(db);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Error updating FAQ:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to update FAQ';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
-app.delete('/api/faqs/:id', verifyAdmin, (req, res) => {
+app.delete('/api/faqs/:id', verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const db = readDb();
   db.faqs = (db.faqs || []).filter((f: FAQItem) => f.id !== id);
-  writeDb(db);
-  res.json({ success: true });
+  try {
+    await writeDb(db);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Error deleting FAQ:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to delete FAQ';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
-app.put('/api/faqs-reorder', verifyAdmin, (req, res) => {
+app.put('/api/faqs-reorder', verifyAdmin, async (req, res) => {
   const { faqs } = req.body;
   if (!Array.isArray(faqs)) {
     return res.status(400).json({ error: 'FAQs list must be an array' });
   }
   const db = readDb();
   db.faqs = faqs;
-  writeDb(db);
-  res.json({ success: true });
+  try {
+    await writeDb(db);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Error reordering FAQs:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to reorder FAQs';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
 // Enquiries
-app.post('/api/enquiries', (req, res) => {
+app.post('/api/enquiries', async (req, res) => {
   const { name, email, phone, message, preferredContact } = req.body;
 
   if (!name || (!email && !phone) || !message) {
@@ -583,9 +691,15 @@ app.post('/api/enquiries', (req, res) => {
   };
 
   db.enquiries = [newEnquiry, ...(db.enquiries || [])];
-  writeDb(db);
 
-  return res.status(201).json({ success: true, message: 'Enquiry submitted successfully', enquiryId: newEnquiry.id });
+  try {
+    await writeDb(db);
+    return res.status(201).json({ success: true, message: 'Enquiry submitted successfully', enquiryId: newEnquiry.id });
+  } catch (err: any) {
+    console.error('Error saving enquiry:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to save enquiry';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
 app.get('/api/enquiries', verifyAdmin, (_req, res) => {
@@ -593,11 +707,11 @@ app.get('/api/enquiries', verifyAdmin, (_req, res) => {
   res.json({ enquiries: db.enquiries || [] });
 });
 
-app.put('/api/enquiries/:id/status', verifyAdmin, (req, res) => {
+app.put('/api/enquiries/:id/status', verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   const db = readDb();
-  
+
   db.enquiries = (db.enquiries || []).map((e: Enquiry) => {
     if (e.id === id) {
       return { ...e, status };
@@ -605,16 +719,28 @@ app.put('/api/enquiries/:id/status', verifyAdmin, (req, res) => {
     return e;
   });
 
-  writeDb(db);
-  res.json({ success: true });
+  try {
+    await writeDb(db);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Error updating enquiry status:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to update enquiry status';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
-app.delete('/api/enquiries/:id', verifyAdmin, (req, res) => {
+app.delete('/api/enquiries/:id', verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const db = readDb();
   db.enquiries = (db.enquiries || []).filter((e: Enquiry) => e.id !== id);
-  writeDb(db);
-  res.json({ success: true });
+  try {
+    await writeDb(db);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Error deleting enquiry:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to delete enquiry';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
 // Gallery API
@@ -623,7 +749,7 @@ app.get('/api/gallery', (_req, res) => {
   res.json({ gallery: db.gallery || initialGallery });
 });
 
-app.post('/api/gallery', verifyAdmin, (req, res) => {
+app.post('/api/gallery', verifyAdmin, async (req, res) => {
   const { title, caption, imageUrl, category } = req.body;
   if (!title || !imageUrl) {
     return res.status(400).json({ error: 'Title and image URL are required' });
@@ -639,11 +765,17 @@ app.post('/api/gallery', verifyAdmin, (req, res) => {
   };
 
   db.gallery = [newItem, ...(db.gallery || [])];
-  writeDb(db);
-  res.status(201).json({ success: true, item: newItem });
+  try {
+    await writeDb(db);
+    return res.status(201).json({ success: true, item: newItem });
+  } catch (err: any) {
+    console.error('Error saving gallery item:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to save gallery item';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
-app.put('/api/gallery/:id', verifyAdmin, (req, res) => {
+app.put('/api/gallery/:id', verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const { title, caption, category, imageUrl } = req.body;
   const db = readDb();
@@ -661,27 +793,45 @@ app.put('/api/gallery/:id', verifyAdmin, (req, res) => {
     return g;
   });
 
-  writeDb(db);
-  res.json({ success: true });
+  try {
+    await writeDb(db);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Error updating gallery item:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to update gallery item';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
-app.delete('/api/gallery/:id', verifyAdmin, (req, res) => {
+app.delete('/api/gallery/:id', verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const db = readDb();
   db.gallery = (db.gallery || []).filter((g: GalleryItem) => g.id !== id);
-  writeDb(db);
-  res.json({ success: true });
+  try {
+    await writeDb(db);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Error deleting gallery item:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to delete gallery item';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
-app.put('/api/gallery-reorder', verifyAdmin, (req, res) => {
+app.put('/api/gallery-reorder', verifyAdmin, async (req, res) => {
   const { gallery } = req.body;
   if (!Array.isArray(gallery)) {
     return res.status(400).json({ error: 'Gallery list must be an array' });
   }
   const db = readDb();
   db.gallery = gallery;
-  writeDb(db);
-  res.json({ success: true });
+  try {
+    await writeDb(db);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Error reordering gallery:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to reorder gallery';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
 // Blog API
@@ -703,7 +853,7 @@ app.get('/api/blog/:slugOrId', (req, res) => {
   res.json({ post });
 });
 
-app.post('/api/blog', verifyAdmin, (req, res) => {
+app.post('/api/blog', verifyAdmin, async (req, res) => {
   const { title, summary, content, imageUrl, tags, author, date } = req.body;
   if (!title || !content) {
     return res.status(400).json({ error: 'Title and content are required' });
@@ -729,11 +879,17 @@ app.post('/api/blog', verifyAdmin, (req, res) => {
   };
 
   db.blogPosts = [newPost, ...(db.blogPosts || [])];
-  writeDb(db);
-  res.status(201).json({ success: true, post: newPost });
+  try {
+    await writeDb(db);
+    return res.status(201).json({ success: true, post: newPost });
+  } catch (err: any) {
+    console.error('Error saving blog post:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to save blog post';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
-app.put('/api/blog/:id', verifyAdmin, (req, res) => {
+app.put('/api/blog/:id', verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const { title, summary, content, imageUrl, tags, author, date, published } = req.body;
   const db = readDb();
@@ -762,16 +918,28 @@ app.put('/api/blog/:id', verifyAdmin, (req, res) => {
     return p;
   });
 
-  writeDb(db);
-  res.json({ success: true });
+  try {
+    await writeDb(db);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Error updating blog post:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to update blog post';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
-app.delete('/api/blog/:id', verifyAdmin, (req, res) => {
+app.delete('/api/blog/:id', verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const db = readDb();
   db.blogPosts = (db.blogPosts || []).filter((p: BlogPost) => p.id !== id);
-  writeDb(db);
-  res.json({ success: true });
+  try {
+    await writeDb(db);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Error deleting blog post:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to delete blog post';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
 // Reviews API
@@ -786,7 +954,7 @@ app.get('/api/reviews', (_req, res) => {
   });
 });
 
-app.post('/api/reviews', verifyAdmin, (req, res) => {
+app.post('/api/reviews', verifyAdmin, async (req, res) => {
   const { authorName, rating, relativeTime, text, source, googleProfileUrl } = req.body;
   if (!authorName || !text) {
     return res.status(400).json({ error: 'Author name and review text are required' });
@@ -804,11 +972,17 @@ app.post('/api/reviews', verifyAdmin, (req, res) => {
   };
 
   db.reviews = [newRev, ...(db.reviews || [])];
-  writeDb(db);
-  res.status(201).json({ success: true, review: newRev });
+  try {
+    await writeDb(db);
+    return res.status(201).json({ success: true, review: newRev });
+  } catch (err: any) {
+    console.error('Error saving review:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to save review';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
-app.put('/api/reviews/:id', verifyAdmin, (req, res) => {
+app.put('/api/reviews/:id', verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const { authorName, rating, relativeTime, text, source, googleProfileUrl } = req.body;
   const db = readDb();
@@ -828,16 +1002,28 @@ app.put('/api/reviews/:id', verifyAdmin, (req, res) => {
     return r;
   });
 
-  writeDb(db);
-  res.json({ success: true });
+  try {
+    await writeDb(db);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Error updating review:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to update review';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
-app.delete('/api/reviews/:id', verifyAdmin, (req, res) => {
+app.delete('/api/reviews/:id', verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const db = readDb();
   db.reviews = (db.reviews || []).filter((r: Review) => r.id !== id);
-  writeDb(db);
-  res.json({ success: true });
+  try {
+    await writeDb(db);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Error deleting review:', err);
+    const message = err && err.message ? String(err.message) : 'Failed to delete review';
+    return res.status(500).json({ success: false, error: message });
+  }
 });
 
 // Delete media endpoint (filename param). Supports Supabase Storage and local uploads
